@@ -40,6 +40,7 @@ try:
             else:
                 message = key.data
                 try:
+                    print("mask:",mask)
                     message.process_events(mask)
                 except Exception:
                     print(

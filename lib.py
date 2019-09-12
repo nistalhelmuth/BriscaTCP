@@ -27,8 +27,13 @@ class Message:
     def _set_selector_events_mask(self, mode):
         """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
         if mode == "r":
+            self._jsonheader_len = None
+            self.jsonheader = None
+            self.request = None
             events = selectors.EVENT_READ
         elif mode == "w":
+            self._send_buffer = b""
+            self.response_created = False
             events = selectors.EVENT_WRITE
         elif mode == "rw":
             events = selectors.EVENT_READ | selectors.EVENT_WRITE
@@ -60,9 +65,6 @@ class Message:
                 pass
             else:
                 self._send_buffer = self._send_buffer[sent:]
-                # Close when the buffer is drained. The response has been sent.
-                if sent and not self._send_buffer:
-                    self.close()
 
     def _json_encode(self, obj, encoding = "utf-8"):
         return json.dumps(obj, ensure_ascii=False).encode(encoding)
@@ -122,6 +124,7 @@ class Message:
             if not self.response_created:
                 self.create_response()
         self._write()
+        self._set_selector_events_mask("r")
     
     def close(self):
         print("closing connection to", self.addr)
@@ -171,8 +174,6 @@ class Message:
     
         self.request = self._json_decode(data)
         print("received request", repr(self.request), "from", self.addr)
-        
-        # Set selector to listen for write events, we're done reading.
         self._set_selector_events_mask("w")
     
     def create_response(self):
