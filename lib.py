@@ -5,14 +5,7 @@ import io
 import struct
 
 
-request_search = {
-    "morpheus": "Follow the white rabbit. \U0001f430",
-    "ring": "In the caves beneath the Misty Mountains. \U0001f48d",
-    "\U0001f436": "\U0001f43e Playing ball! \U0001f3d0",
-}
-
-
-class Message:
+class SocketHandler:
     def __init__(self, selector, sock, addr):
         self.selector = selector
         self.sock = sock
@@ -86,25 +79,6 @@ class Message:
         message = message_hdr + jsonheader_bytes + content_bytes
         return message
     
-    def _create_response_json_content(self):
-        action = self.request.get("action")
-        if action == "search":
-            query = self.request.get("value")
-            answer = request_search.get(query) or f'No match for "{query}".'
-            content = {"result": answer}
-        else:
-            content = {"result": f'Error: invalid action "{action}".'}
-        response = {
-            "content_bytes": self._json_encode(content),
-        }
-        return response
-
-    def process_events(self, mask):
-        if mask & selectors.EVENT_READ:
-            self.read()
-        if mask & selectors.EVENT_WRITE:
-            self.write()
-    
     def read(self):
         self._read()
 
@@ -119,10 +93,10 @@ class Message:
             if self.request is None:
                 self.process_request()
 
-    def write(self):
+    def write(self, content):
         if self.request:
             if not self.response_created:
-                self.create_response()
+                self.create_response(content)
         self._write()
         self._set_selector_events_mask("r")
     
@@ -173,11 +147,12 @@ class Message:
         self._recv_buffer = self._recv_buffer[content_len:]
     
         self.request = self._json_decode(data)
-        print("received request", repr(self.request), "from", self.addr)
         self._set_selector_events_mask("w")
     
-    def create_response(self):
-        response = self._create_response_json_content()
-        message = self._create_message(**response)
-        self.response_created = True
-        self._send_buffer += message
+    def create_response(self, content):
+        response = {
+            "content_bytes": self._json_encode(content),
+        }
+        message = self._create_message(**response)# le agrego el hader
+        self.response_created = True # listo
+        self._send_buffer += message #agregar
