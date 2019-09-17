@@ -2,57 +2,9 @@ import sys
 import socket
 import selectors
 import traceback
-
 import lib
+from brisca import Room, Player
 
-class Player:
-    def __init__(self, socket, user_name):
-        self.socket = socket
-        self.user_name = user_name
-        self.state = 'chilling' #inroom - playing
-    
-    def change_state(self, state):
-        if state in ('chilling', 'inroom', 'playing'):
-            self.state = state
-    
-    def write(self, content):
-        self.socket.write(content)
-    
-    def get_user_name(self):
-        return self.user_name
-
-class Room:
-    def __init__(self, room_name):
-        self.room_name = room_name
-        self.triunf = None
-        self.table = None
-        self.players = []
-        self.deck = None
-        self.state = 'waiting' #going
-    
-    def change_state(self, state):
-        if state in ('waiting', 'going'):
-            self.state = state
-    
-    def connect_player(self, new_player):
-        if len(self.players) < 3 and new_player not in self.players:
-            for player in self.players:
-                print("sending entered",player.get_user_name())
-                content = {"status":"player_entered", "room":self.room_name, "new_player": new_player.get_user_name()}
-                player.write(content)
-            self.players.append(new_player)
-            return True
-        return False
-    
-    def disconnet_player(self, player):
-        self.players.remove(player)
-    
-    def get_players_in_room(self):
-        players = []
-        for player in self.players:
-            players.append(player.get_user_name())
-        return players
-    
 
 class Server:
     def __init__(self, host='127.0.0.1', port=3000):
@@ -88,11 +40,26 @@ class Server:
             players.append(name)
         return players
     
+    def message_to_room(self, content, room):
+        room = self.rooms[room]
+        if room:
+            room.send_message_to_all(content)
+            return True
+        return False
+    
+    def message_to_player(self, content, player):
+        player = self.players[player]
+        if player:
+            player.write(content)
+            return True
+        return False
+    
 
     def evaluate_request(self, socket):
         request = socket.request
         print(socket.addr, request)
         close = False
+        write = True
         action = request['action']
         user = request['user']
         if action == 'login':
@@ -140,6 +107,26 @@ class Server:
             elif action == 'get_players':
                 print("mostrar jugadores")
                 content = {"status":"get_players", "players": self.get_players()}
+            
+            elif action == 'message_to_room':
+                print("enviar mensaje a room")
+                room = request['room']
+                message = request['message']
+                content = {"status":"message_to_room", "from":user , "room":room, "message": message}
+                if(self.message_to_room(content, room)):
+                    content = {"status":"message_to_room_sent", "from":user , "room":room, "message": message}
+                else:
+                    content = {"status":"error", "message": 'couldnt send message to room'}
+            
+            elif action == 'message_to_player':
+                print("enviar mensaje a jugador")
+                to = request['to']
+                message = request['message']
+                content = {"status":"message_to_player", "from":user , "to":to, "message": message}
+                if (self.message_to_player(content, to)):
+                    content = {"status":"message_to_player_sent", "from":user , "to":to, "message": message}
+                else:
+                    content = {"status":"error", "message": 'couldnt send message to player'}
 
             elif action == 'disconnect':
                 print("bye player")
