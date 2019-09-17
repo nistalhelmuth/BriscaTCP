@@ -10,6 +10,10 @@ class Player:
         self.socket = socket
         self.user_name = user_name
         self.state = 'chilling' #inroom - playing
+    
+    def change_state(self, state):
+        if state in ('chilling', 'inroom', 'playing'):
+            self.state = state
 
 class Room:
     def __init__(self, room_name):
@@ -19,6 +23,23 @@ class Room:
         self.players = []
         self.deck = None
         self.state = 'waiting' #going
+    
+    def change_state(self, state):
+        if state in ('waiting', 'going'):
+            self.state = state
+    
+    def connect_player(self, player):
+        if len(self.players) < 3:
+            self.players.append(player)
+            return True
+        return False
+    
+    def disconnet_player(self, player):
+        self.players.remove(player)
+    
+    def get_players_in_room(self):
+        return self.players
+    
 
 class Server:
     def __init__(self, host='127.0.0.1', port=3000):
@@ -45,7 +66,7 @@ class Server:
         rooms = []
         for name in self.rooms.keys():
             rooms.append(name)
-        return self.rooms
+        return rooms
 
     
     def get_players(self):
@@ -59,50 +80,67 @@ class Server:
         request = socket.request
         print(socket.addr, request)
         close = False
-        value = request['value']
         action = request['action']
+        user = request['user']
         if action == 'login':
             print("agregar usuario")
-            user = Player(socket, value)
-            if value not in self.players.keys():
-                self.players[value] = user
+            player = Player(socket, user)
+            if user not in self.players.keys():
+                self.players[user] = player
                 print("usuario agregado")
-                content = {"status":"ok", "rooms":self.get_rooms(), "players": self.get_players()}
+                content = {"status":"login", "rooms":self.get_rooms(), "players": self.get_players()}
             else:
                 print("usuario ya existe")
-                content = {"status":"error", "message": f'User "{value}" exists'}
+                content = {"status":"error", "message": f'User "{user}" exists'}
                 close = True
 
-        elif action == 'get_rooms':
-            print("mostrar rooms")
-            content = {"status":"ok", "rooms":self.get_rooms()}
+        elif user in self.players.keys():
+            if action == 'get_rooms':
+                print("mostrar rooms")
+                content = {"status":"get_rooms", "rooms":self.get_rooms()}
 
-        elif action == 'create_room':
-            print("agregar room")
-            room = Room(value)
-            if value not in self.rooms.keys():
-                self.rooms[value] = room
-                print("room agregado")
-                content = {"status":"ok", "rooms":self.get_rooms()}
+            elif action == 'create_room':
+                print("agregar room")
+                room_name = request['room']
+                room = Room(room_name)
+                if room_name not in self.rooms.keys():
+                    self.rooms[room_name] = room
+                    print("room agregado")
+                    #content = {"status":"create_room", "rooms":self.get_rooms()}
+                    content = {"status":"get_rooms", "rooms":self.get_rooms()}
+                else:
+                    print("room ya existe")
+                    content = {"status":"error", "message": f'Room "{room_name}" exists'}
+
+            elif action == 'join_room':
+                print("usuario unido a room")
+                room_name = request['room']
+                if room_name in self.rooms.keys():
+                    if (self.rooms[room_name].connect_player(user)):
+                        self.players[user].change_state('inroom')
+                        content = {"status":"join_room", "room":room_name ,"players_in_room": self.rooms[room_name].get_players_in_room()}
+                    else:
+                        content = {"status":"error", "message": f'Room "{room_name}"is full'}
+
+                else:
+                    content = {"status":"error", "message": f'Room "{room_name}"doesnt exists'}
+
+            elif action == 'get_players':
+                print("mostrar jugadores")
+                content = {"status":"get_players", "players": self.get_players()}
+
+            elif action == 'disconnect':
+                print("bye player")
+                self.players.pop(user)
+                content = {"status":"disconnect"}
+                close = True
+
+            #TODO: enviar y recibir mensajes (chat)
+            #TODO: logica del juego
             else:
-                print("room ya existe")
-                content = {"status":"error", "message": f'Room "{value}" exists'}
-
-        elif action == 'join_room':
-            print("agregar a room")
-            print("agregar cambiar estado")
-
-        elif action == 'get_players':
-            print("mostrar jugadores")
-            content = {"status":"ok", "players": self.get_players()}
-
-        elif action == 'disconnect':
-            print("bye player")
-            content = {"status":"ok"}
-            close = True
-
+                content = {"status":"error", "message": f'Command "{action}" doesnt exists'}
         else:
-            content = {"status":"error", "message": f'Command "{action}" doesnt exists'}
+                content = {"status":"error", "message": 'login first'}
 
         socket.write(content)
         if close:
