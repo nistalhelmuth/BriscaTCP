@@ -14,6 +14,12 @@ class Player:
     def change_state(self, state):
         if state in ('chilling', 'inroom', 'playing'):
             self.state = state
+    
+    def write(self, content):
+        self.socket.write(content)
+    
+    def get_user_name(self):
+        return self.user_name
 
 class Room:
     def __init__(self, room_name):
@@ -28,9 +34,13 @@ class Room:
         if state in ('waiting', 'going'):
             self.state = state
     
-    def connect_player(self, player):
-        if len(self.players) < 3:
-            self.players.append(player)
+    def connect_player(self, new_player):
+        if len(self.players) < 3 and new_player not in self.players:
+            for player in self.players:
+                print("sending entered",player.get_user_name())
+                content = {"status":"player_entered", "room":self.room_name, "new_player": new_player.get_user_name()}
+                player.write(content)
+            self.players.append(new_player)
             return True
         return False
     
@@ -38,7 +48,10 @@ class Room:
         self.players.remove(player)
     
     def get_players_in_room(self):
-        return self.players
+        players = []
+        for player in self.players:
+            players.append(player.get_user_name())
+        return players
     
 
 class Server:
@@ -106,8 +119,7 @@ class Server:
                 if room_name not in self.rooms.keys():
                     self.rooms[room_name] = room
                     print("room agregado")
-                    #content = {"status":"create_room", "rooms":self.get_rooms()}
-                    content = {"status":"get_rooms", "rooms":self.get_rooms()}
+                    content = {"status":"room_created", "rooms":self.get_rooms()}
                 else:
                     print("room ya existe")
                     content = {"status":"error", "message": f'Room "{room_name}" exists'}
@@ -116,7 +128,7 @@ class Server:
                 print("usuario unido a room")
                 room_name = request['room']
                 if room_name in self.rooms.keys():
-                    if (self.rooms[room_name].connect_player(user)):
+                    if (self.rooms[room_name].connect_player(self.players[user])):
                         self.players[user].change_state('inroom')
                         content = {"status":"join_room", "room":room_name ,"players_in_room": self.rooms[room_name].get_players_in_room()}
                     else:

@@ -94,9 +94,10 @@ class SocketHandler:
                 self.process_request()
 
     def write(self, content):
-        if self.request:
-            if not self.response_created:
-                self.create_response(content)
+        self._set_selector_events_mask("w")
+        if not self.response_created:
+            
+            self.create_response(content)
         self._write()
         self._set_selector_events_mask("r")
     
