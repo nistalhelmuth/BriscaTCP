@@ -46,10 +46,10 @@ class Room:
     def start_game(self):
         print("room ready",self.room_name)
         self.change_state('going')
-        self.turn = randint(0, 3)
-        self.create_deck()
+        self.turn = randint(0, 3) #quien empieza
+        self.create_deck() #crea la baraja
         for player in self.players:
-            content = {"status":"room_ready", "player":self.players[self.turn].user_name, "cards": self.deck[:3], "triunf": self.deck[-1]}
+            content = {"status":"room_ready", "player":self.players[self.turn].get_user_name, "cards": self.deck[:3], "triunf": self.deck[-1]}
             self.player_list.append(player.get_user_name())
             self.scores[player.get_user_name()] = 0
             self.round_picks[player.get_user_name()] = ''
@@ -57,7 +57,7 @@ class Room:
             player.write(content)
     
     def try_start(self):
-        if len(self.players) == 2: ##cambiar a 4
+        if len(self.players) == 4:
             self.start_game()
     
     def check_picks(self):
@@ -101,38 +101,42 @@ class Room:
     def finish_round(self):
         if len(deck) == 0:
             content = {"status":"game_finished"}
-            for player in self.players:
-                content[player.user_name] = self.scores[player.user_name]
+            for player in self.players:#agregar todos los resultados
+                content[player.get_user_name()] = self.scores[player.get_user_name()]
+            for player in self.players:#enviar todos los resultados completos
                 player.write(content)
+            
         else:
             winner = self.check_picks()
-            self.turn = 0 ###revisar self.player_list.index(winner)
             self.calculate_scores()
+            self.turn = self.player_list.index(winner)
             for player in self.players:
                 content = {"status":"round_finished", "winner": winner, "next_card":self.deck[:1]}
                 self.deck = self.deck[1:]
                 player.write(content)
     
     def card_pick(self, card, player_name):
-        #validar si es el turno del chato que envia
-        self.round_picks[player_name] = card
-        self.turn = (self.turn + 1) % 4
-        for player in self.players:
-            content = {"status":"player_picked_card", "next_player":self.players[self.turn].user_name, "card": card, "picked":player_name}
-            player.write(content)
-        if len(self.round_picks) == 4:
-            self.finish_round(self)
+        if self.state == 'going' and player_name == self.player_list[self.turn] :
+            self.round_picks[player_name] = card
+            self.turn = (self.turn + 1) % 4
+            for player in self.players:
+                content = {"status":"player_picked_card", "next_player":self.player_list[self.turn], "card": card, "picked":player_name}
+                player.write(content)
+            if len(self.round_picks) == 4:
+                self.finish_round(self)
+                self.round_picks = {}
+        else:
+            print("ERROR IN CARD_PICK", self.state, player_name, self.player_list, self.turn)
 
 
     
     def connect_player(self, new_player):
-        if new_player not in self.players:
-            if len(self.players) < 3:
-                for player in self.players:
-                    print("sending entered",player.get_user_name())
-                    content = {"status":"player_entered", "room":self.room_name, "new_player": new_player.get_user_name()}
-                    player.write(content)
-                self.players.append(new_player)
+        if new_player not in self.players and len(self.players) < 3:
+            for player in self.players:
+                print("sending entered to",player.get_user_name())
+                content = {"status":"player_entered", "room":self.room_name, "new_player": new_player.get_user_name()}
+                player.write(content)
+            self.players.append(new_player)
             return True
         return False
     

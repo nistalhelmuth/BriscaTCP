@@ -95,7 +95,8 @@ class Server:
                 print("usuario unido a room")
                 room_name = request['room']
                 if room_name in self.rooms.keys():
-                    if (self.rooms[room_name].connect_player(self.players[user])):
+                    connected = self.rooms[room_name].connect_player(self.players[user])
+                    if connected:
                         self.players[user].change_state('inroom')
                         content = {"status":"join_room", "room":room_name ,"players_in_room": self.rooms[room_name].get_players_in_room()}
                         socket.write(content)
@@ -138,6 +139,7 @@ class Server:
                 player_name = request['player_name']
                 if room in self.rooms.keys():
                     self.rooms[room].card_pick(card, player_name)
+                    write = False
                 else:
                     content = {"status":"error", "message": 'room doesnt exists'}
 
