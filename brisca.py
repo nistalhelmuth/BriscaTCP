@@ -30,6 +30,7 @@ class Room:
         self.table = None
         self.turn = 0
         self.round_picks = {}
+        self.total_picks = 0
         self.scores = {}
         self.players = []
         self.player_list = []
@@ -125,13 +126,15 @@ class Room:
     def card_pick(self, card, player_name):
         if self.state == 'going' and player_name == self.player_list[self.turn]:
             self.round_picks[player_name] = card
+            self.total_picks += 1 
             self.turn = (self.turn + 1) % 4
             for player in self.players:
                 content = {"status": "player_picked_card",
                            "next_player": self.player_list[self.turn], "card": card, "picked": player_name}
                 player.write(content)
-            if len(self.round_picks) == 4:
-                self.finish_round(self)
+            if self.total_picks == 4:
+                self.total_picks = 0
+                self.finish_round()
                 self.round_picks = {}
         else:
             print("ERROR IN CARD_PICK", self.state,
