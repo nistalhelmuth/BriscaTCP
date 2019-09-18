@@ -1,11 +1,6 @@
 from random import randint
 import time
 
-CARDS = ["clubs_1", "clubs_2", "clubs_3", "clubs_4", "clubs_5", "clubs_6", "clubs_7", "clubs_10", "clubs_11", "clubs_12",
-         "hearts_1", "hearts_2", "hearts_3", "hearts_4", "hearts_5", "hearts_6", "hearts_7", "hearts_10", "hearts_11", "hearts_12",
-         "spades_1", "spades_2", "spades_3", "spades_4", "spades_5", "spades_6", "spades_7", "spades_10", "spades_11", "spades_12",
-         "diamonds_1", "diamonds_2", "diamonds_3", "diamonds_4", "diamonds_5", "diamonds_6", "diamonds_7", "diamonds_10", "diamonds_11", "diamonds_12"]
-
 
 class Player:
     def __init__(self, socket, user_name):
@@ -36,7 +31,11 @@ class Room:
         self.player_list = []
         self.deck = []
         self.state = 'waiting'  # going
-        self.cards = CARDS
+        self.CARDS = ["clubs_1", "clubs_2", "clubs_3", "clubs_4", "clubs_5", "clubs_6", "clubs_7", "clubs_10", "clubs_11", "clubs_12",
+                      "hearts_1", "hearts_2", "hearts_3", "hearts_4", "hearts_5", "hearts_6", "hearts_7", "hearts_10", "hearts_11", "hearts_12",
+                      "spades_1", "spades_2", "spades_3", "spades_4", "spades_5", "spades_6", "spades_7", "spades_10", "spades_11", "spades_12",
+                      "diamonds_1", "diamonds_2", "diamonds_3", "diamonds_4", "diamonds_5", "diamonds_6", "diamonds_7", "diamonds_10", "diamonds_11", "diamonds_12"]
+        self.cards = self.CARDS.copy()
 
     def change_state(self, state):
         if state in ('waiting', 'going'):
@@ -67,13 +66,13 @@ class Room:
             self.start_game()
 
     def check_picks(self):
-        triunf = CARDS.index(self.deck[-1])
+        triunf = self.CARDS.index(self.deck[-1])
         palo = int(triunf / 10)
         best = -1
         user = ''
         for player in self.round_picks.keys():
             card = self.round_picks[player]
-            baza = CARDS.index(card)
+            baza = self.CARDS.index(card)
             valor = int(baza / 10)
             if (palo == valor):
                 new_best = (baza % 10)+10
@@ -88,29 +87,31 @@ class Room:
         return user
 
     def calculate_scores(self):
-        for player in self.players.keys():
-            pick = self.round_picks[player]
-            baza = CARDS.index(pick)
+        for player in self.players:
+            player_name = player.get_user_name()
+            pick = self.round_picks[player_name]
+            baza = self.CARDS.index(pick)
             result = baza % 10
             if result == 0:
-                self.scores[player] += 11
+                self.scores[player_name] += 11
             if result == 2:
-                self.scores[player] += 10
+                self.scores[player_name] += 10
             if result == 7:
-                self.scores[player] += 2
+                self.scores[player_name] += 2
             if result == 8:
-                self.scores[player] += 3
+                self.scores[player_name] += 3
             if result == 9:
-                self.scores[player] += 4
+                self.scores[player_name] += 4
         self.round_picks = {}
 
     def finish_round(self):
-        if len(deck) == 0:
+        if len(self.deck) == 0:
             content = {"status": "game_finished"}
             for player in self.players:  # agregar todos los resultados
                 content[player.get_user_name(
                 )] = self.scores[player.get_user_name()]
             for player in self.players:  # enviar todos los resultados completos
+                time.sleep(0.5)
                 player.write(content)
 
         else:
@@ -118,6 +119,7 @@ class Room:
             self.calculate_scores()
             self.turn = self.player_list.index(winner)
             for player in self.players:
+                time.sleep(0.5)
                 content = {"status": "round_finished",
                            "winner": winner, "next_card": self.deck[:1]}
                 self.deck = self.deck[1:]
@@ -126,7 +128,7 @@ class Room:
     def card_pick(self, card, player_name):
         if self.state == 'going' and player_name == self.player_list[self.turn]:
             self.round_picks[player_name] = card
-            self.total_picks += 1 
+            self.total_picks += 1
             self.turn = (self.turn + 1) % 4
             for player in self.players:
                 content = {"status": "player_picked_card",
