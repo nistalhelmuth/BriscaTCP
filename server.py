@@ -98,6 +98,9 @@ class Server:
                     if (self.rooms[room_name].connect_player(self.players[user])):
                         self.players[user].change_state('inroom')
                         content = {"status":"join_room", "room":room_name ,"players_in_room": self.rooms[room_name].get_players_in_room()}
+                        socket.write(content)
+                        write = False
+                        self.rooms[room_name].try_start()
                     else:
                         content = {"status":"error", "message": f'Room "{room_name}"is full'}
 
@@ -128,6 +131,16 @@ class Server:
                 else:
                     content = {"status":"error", "message": 'couldnt send message to player'}
 
+            elif action == 'card_pick':
+                print('seleccion del jugador')
+                room = request['room']
+                pick = request['card']
+                player_name = request['player_name']
+                if room in self.rooms.keys():
+                    self.rooms[room].card_pick(card, player_name)
+                else:
+                    content = {"status":"error", "message": 'room doesnt exists'}
+
             elif action == 'disconnect':
                 print("bye player")
                 self.players.pop(user)
@@ -141,7 +154,8 @@ class Server:
         else:
                 content = {"status":"error", "message": 'login first'}
 
-        socket.write(content)
+        if write:
+            socket.write(content)
         if close:
             socket.close()
     
