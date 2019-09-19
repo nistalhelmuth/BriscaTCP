@@ -3,6 +3,7 @@ import socket
 import selectors
 import traceback
 import lib
+import argparse
 from brisca import Room, Player
 
 
@@ -200,6 +201,18 @@ class Server:
         finally:
             self.sel.close()
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Brisca client.')
+    parser.add_argument('-p', dest='port', help='host to use')
 
-server = Server()
-server.start()
+    args = parser.parse_args()
+
+    if args.port is None:
+        server = Server()
+        server.start()
+    else:
+        
+        server = Server(host=args.port)
+        server.start()
+#server = Server(host='192.168.1.100')
+#server.start()
